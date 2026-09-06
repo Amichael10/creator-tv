@@ -1,0 +1,19 @@
+{
+  "name": "CreatorTV",
+  "short_name": "CreatorTV",
+  "description": "Turn internet creators and broadcasters into television stations for smart TVs.",
+  "start_url": "/tv",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#060606",
+  "theme_color": "#E50914",
+  "icons": [
+    {
+      "src": "/icons/creatortv-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["entertainment", "video", "news"]
+}

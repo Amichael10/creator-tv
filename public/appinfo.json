@@ -1,0 +1,18 @@
+{
+  "id": "com.creatortv.app",
+  "version": "1.2.0",
+  "vendor": "CreatorTV Inc.",
+  "type": "web",
+  "main": "tv/index.html",
+  "title": "CreatorTV",
+  "icon": "icons/creatortv-512.svg",
+  "largeIcon": "icons/creatortv-512.svg",
+  "bgImage": "",
+  "resolution": "1920x1080",
+  "supportTouch": false,
+  "supportMouse": true,
+  "supportKey": true,
+  "requiredPermissions": [
+    "network"
+  ]
+}

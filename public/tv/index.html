@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CreatorTV</title>
+  <link rel="stylesheet" href="/tv/tv.css">
+</head>
+<body class="tv-body">
+
+  <!-- View 1: Initial Pairing Screen with QR Code + 6-Char Code -->
+  <div id="view-pairing" class="tv-view active">
+    <div class="tv-safe-zone pairing-layout">
+      <div class="tv-brand-header">
+        <span class="tv-badge">CREATOR TV</span>
+        <span class="tv-tagline-mini">SMART BROADCAST BRIDGE</span>
+      </div>
+
+      <h1 class="tv-title">Connect your television</h1>
+
+      <div class="pairing-split-card">
+        <!-- Left: Instant Camera Scan QR Code -->
+        <div class="pairing-col-qr">
+          <div id="tv-qr-mount" class="qr-wrapper"></div>
+          <p class="qr-caption">Scan with Phone Camera</p>
+        </div>
+
+        <div class="pairing-divider">
+          <span>OR</span>
+        </div>
+
+        <!-- Right: 6-Character Manual Code -->
+        <div class="pairing-col-code">
+          <p class="tv-instruction-main">Open browser on phone or PC:</p>
+          <p id="connect-url-display" class="tv-url">https://creatortv.app/connect</p>
+          <p class="tv-instruction-sub">Enter the 6-character code:</p>
+
+          <div class="tv-code-container">
+            <div id="pairing-code" class="tv-pair-code">------</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tv-status-indicator">
+        <span class="tv-spinner"></span>
+        <span id="pairing-status-text">Waiting for phone connection...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- View 2: Paired Station Screen (Multi-Station Broadcast Mode) -->
+  <div id="view-station" class="tv-view">
+    <div class="tv-safe-zone station-layout">
+      <div class="station-header">
+        <div class="station-logo-group">
+          <div id="station-channel-num" class="station-channel-num">CH 01</div>
+          <div id="station-logo-text" class="station-logo">ARISE</div>
+          <div id="station-sublogo-text" class="station-sublogo">NEWS</div>
+        </div>
+        <div id="station-badge" class="badge-live">
+          <span class="live-dot"></span> LIVE
+        </div>
+      </div>
+
+      <div class="station-content">
+        <div id="station-genre-tag" class="station-genre-tag">NEWS & POLITICS</div>
+        <h2 id="station-program-title" class="station-program-title">ARISE NEWS LIVE</h2>
+        <p id="station-program-desc" class="station-program-desc">
+          24-hour breaking news, politics, business and current affairs broadcast globally.
+        </p>
+
+        <div id="fallback-container" class="fallback-container" style="display: none;">
+          <p class="fallback-heading">CURRENT SEGMENT / LATEST BROADCAST</p>
+          <div class="fallback-card">
+            <img id="fallback-thumbnail" class="fallback-thumbnail" src="" alt="Thumbnail">
+            <div class="fallback-details">
+              <h3 id="fallback-title" class="fallback-video-title">--</h3>
+              <p id="fallback-date" class="fallback-video-date">--</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="station-actions">
+          <button id="btn-watch" class="tv-button primary" data-focusable="true" tabindex="0">
+            ▶ WATCH BROADCAST
+          </button>
+          <button id="btn-open-guide" class="tv-button secondary" data-focusable="true">
+            📺 TV GUIDE (CHANNELS)
+          </button>
+        </div>
+      </div>
+
+      <div class="station-footer">
+        <div class="footer-left">
+          <span class="footer-tag">CreatorTV Station Mode</span>
+          <span class="footer-tip">Press [▲ / ▼ / CH+/-] to change channel • Press [MENU] for TV Guide</span>
+        </div>
+        <div id="station-clock" class="station-clock">12:00 PM</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View 3: Fullscreen Player View -->
+  <div id="view-player" class="tv-view player-view">
+    <div id="yt-player-mount" class="player-iframe-container"></div>
+    
+    <!-- Now Playing HUD Overlay (Auto-Fades After 4s) -->
+    <div id="now-playing-hud" class="now-playing-hud">
+      <div class="hud-channel-badge" id="hud-channel-num">CH 01</div>
+      <div class="hud-info">
+        <div class="hud-station-title" id="hud-station-title">ARISE News</div>
+        <div class="hud-program-title" id="hud-program-title">24/7 International Live Broadcast</div>
+      </div>
+      <div class="hud-live-tag" id="hud-live-tag">● LIVE</div>
+    </div>
+
+    <div id="player-loading-overlay" class="player-overlay">
+      <div class="tv-spinner large"></div>
+      <p id="player-loading-text" class="player-status-text">Starting broadcast...</p>
+      <p class="player-sub-text">Press [Back / Escape] at any time to return</p>
+    </div>
+
+    <div id="player-error-overlay" class="player-overlay error-mode" style="display: none;">
+      <h2 class="error-title">Playback Restricted</h2>
+      <p id="player-error-message" class="error-desc">
+        CreatorTV could not play this stream on this television.
+      </p>
+      <p id="player-error-code" class="error-code-label">Error Code: --</p>
+      
+      <div class="error-actions">
+        <button id="btn-player-retry" class="tv-button" data-focusable="true">TRY AGAIN</button>
+        <button id="btn-player-guide" class="tv-button secondary" data-focusable="true">CHANGE CHANNEL</button>
+        <button id="btn-player-back" class="tv-button secondary" data-focusable="true">BACK TO STATION</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TV Guide Overlay Drawer (Toggle via Remote Menu / Up) -->
+  <div id="tv-guide-overlay" class="tv-guide-overlay" style="display: none;">
+    <div class="guide-backdrop"></div>
+    <div class="guide-panel">
+      <div class="guide-header">
+        <div class="guide-title-group">
+          <span class="guide-badge">CREATORTV</span>
+          <h2>Live TV Guide & Channel Lineup</h2>
+        </div>
+        <button id="btn-close-guide" class="guide-close-btn" data-focusable="true">✕ CLOSE</button>
+      </div>
+      
+      <p class="guide-instructions">Use [◀ / ▶] to select a station • Press [OK / ENTER] to tune TV</p>
+
+      <div id="guide-channel-list" class="guide-channel-list">
+        <!-- Dynamically rendered station cards -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Offline Warning Banner -->
+  <div id="offline-banner" class="offline-banner" style="display: none;">
+    <span class="offline-icon">⚠️</span>
+    <span>No internet connection. Reconnecting automatically...</span>
+  </div>
+
+  <div id="compat-banner" class="compat-banner" style="display: none;">
+    <h2 id="compat-title">Unsupported Browser</h2>
+    <p id="compat-message"></p>
+  </div>
+
+  <!-- Diagnostics HUD (/tv?debug=1) -->
+  <div id="debug-hud" class="debug-hud" style="display: none;">
+    <div class="debug-header">
+      <strong>CreatorTV Diagnostics HUD (Phase 2)</strong>
+      <button id="btn-debug-reset" class="debug-reset-btn" data-focusable="true">RESET THIS TV</button>
+    </div>
+    <div class="debug-grid">
+      <div><strong>Viewport:</strong> <span id="dbg-viewport">--</span></div>
+      <div><strong>Resolution:</strong> <span id="dbg-screen">--</span></div>
+      <div><strong>Online:</strong> <span id="dbg-online">--</span></div>
+      <div><strong>Device ID:</strong> <span id="dbg-device-id">--</span></div>
+      <div><strong>Pair Code:</strong> <span id="dbg-pair-code">--</span> (<span id="dbg-pair-exp">--</span>)</div>
+      <div><strong>Paired State:</strong> <span id="dbg-paired">--</span></div>
+      <div><strong>Active Station:</strong> <span id="dbg-station">--</span></div>
+      <div><strong>Channel ID:</strong> <span id="dbg-channel">--</span></div>
+      <div><strong>Live Mode:</strong> <span id="dbg-live">--</span></div>
+      <div><strong>Video ID:</strong> <span id="dbg-video-id">--</span></div>
+      <div><strong>Pending Command:</strong> <span id="dbg-last-cmd">--</span></div>
+      <div><strong>Player State:</strong> <span id="dbg-player-state">--</span></div>
+      <div><strong>Last Remote Key:</strong> <span id="dbg-last-key">--</span></div>
+      <div><strong>Focus Target:</strong> <span id="dbg-focus">--</span></div>
+    </div>
+    <div class="debug-log-title">Recent Event Log:</div>
+    <div id="dbg-logs" class="debug-logs"></div>
+  </div>
+
+  <script src="/tv/qrcode.js"></script>
+  <script src="/tv/tv.js"></script>
+</body>
+</html>
