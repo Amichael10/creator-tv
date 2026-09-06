@@ -137,8 +137,14 @@ const DEFAULT_STATION_VIDEOS: Record<string, { current: VideoItem | null; fallba
     current: null,
     fallback: [
       {
-        videoId: 'mkbhd_latest',
-        title: 'MKBHD: The Ultimate Smartphone Review & Deep Dive',
+        videoId: 'b5mN0eL_6oE',
+        title: 'MKBHD: Smartphone Awards & Tech Deep Dive',
+        thumbnail: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=640&q=80',
+        publishedAt: new Date().toISOString(),
+      },
+      {
+        videoId: 's416LgI6W5U',
+        title: 'MKBHD: The Future of AI Hardware',
         thumbnail: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=640&q=80',
         publishedAt: new Date().toISOString(),
       },
@@ -148,8 +154,14 @@ const DEFAULT_STATION_VIDEOS: Record<string, { current: VideoItem | null; fallba
     current: null,
     fallback: [
       {
-        videoId: 'veritasium_latest',
-        title: 'Veritasium: The Most Astonishing Scientific Discovery',
+        videoId: '423xGvO0uW0',
+        title: 'Veritasium: The Real Risk of Artificial Intelligence',
+        thumbnail: 'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=640&q=80',
+        publishedAt: new Date().toISOString(),
+      },
+      {
+        videoId: 'bHIhgxav9LY',
+        title: 'Veritasium: How An Infinite Hotel Works',
         thumbnail: 'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=640&q=80',
         publishedAt: new Date().toISOString(),
       },
@@ -159,12 +171,68 @@ const DEFAULT_STATION_VIDEOS: Record<string, { current: VideoItem | null; fallba
     current: null,
     fallback: [
       {
-        videoId: 'kurzgesagt_latest',
-        title: 'Kurzgesagt: What If the Universe is Not What It Seems?',
+        videoId: 'MBRqu0YOH14',
+        title: 'Kurzgesagt: The Last Human on Earth',
+        thumbnail: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=640&q=80',
+        publishedAt: new Date().toISOString(),
+      },
+      {
+        videoId: 'sNhhvQGsMEc',
+        title: 'Kurzgesagt: What If We Detonated All Nuclear Bombs at Once?',
         thumbnail: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=640&q=80',
         publishedAt: new Date().toISOString(),
       },
     ],
+  },
+  mrbeast: {
+    current: null,
+    fallback: [
+      {
+        videoId: '0e3GPea1Tyg',
+        title: 'MrBeast: We Survived The Most Extreme Places On Earth',
+        thumbnail: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=640&q=80',
+        publishedAt: new Date().toISOString(),
+      },
+      {
+        videoId: 'kX3nB4PpJko',
+        title: 'MrBeast: 1,000 Blind People See For The First Time',
+        thumbnail: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=640&q=80',
+        publishedAt: new Date().toISOString(),
+      },
+      {
+        videoId: '9bqk6ZUsKyA',
+        title: 'MrBeast: $1 vs $1,000,000 Hotel Room!',
+        thumbnail: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=640&q=80',
+        publishedAt: new Date().toISOString(),
+      },
+    ],
+  },
+  aljazeera: {
+    current: {
+      videoId: 'gCNeDWCI0wo',
+      title: 'Al Jazeera English 24/7 Live Stream',
+      thumbnail: 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=640&q=80',
+      publishedAt: new Date().toISOString(),
+    },
+    fallback: [],
+  },
+  bbc: {
+    current: {
+      videoId: 'live_bbc_news',
+      title: 'BBC News 24/7 Global Live Broadcast',
+      thumbnail: 'https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?w=640&q=80',
+      publishedAt: new Date().toISOString(),
+    },
+    fallback: [],
+  },
+  cnn: {
+    current: {
+      videoId: 'live_cnn_news',
+      title: 'CNN International 24/7 Live Coverage',
+      thumbnail: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=640&q=80',
+      publishedAt: new Date().toISOString(),
+    },
+    fallback: [],
   },
 };
 

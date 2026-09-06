@@ -30,10 +30,19 @@ export async function POST(req: NextRequest) {
     const cleanSlug = 'custom-' + handle.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
     const existingCount = getAllStations().length;
 
+    const rawDesc = (body?.description || '').trim();
+    let cleanTagline = `Continuous broadcast from ${customTitle || handle}`;
+    if (rawDesc) {
+      const firstLine = rawDesc.split(/[\n\r.]+/)[0].trim();
+      cleanTagline = firstLine.length > 5 && firstLine.length <= 90 
+        ? firstLine 
+        : rawDesc.slice(0, 85).trim() + '...';
+    }
+
     const customStation: StationDefinition = {
       slug: cleanSlug,
       name: customTitle || `Channel ${handle}`,
-      tagline: body?.description || `Continuous broadcast from ${handle}`,
+      tagline: cleanTagline,
       category: category,
       youtubeHandle: handle,
       mode: 'continuous',

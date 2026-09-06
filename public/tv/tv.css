@@ -243,31 +243,43 @@ html, body {
    ========================================== */
 .station-layout {
   justify-content: space-between;
+  position: relative;
+  z-index: 2;
+  height: 100%;
 }
 
 .station-backdrop-bg {
   position: absolute;
   inset: 0;
   background-size: cover;
-  background-position: center;
+  background-position: center top;
   background-repeat: no-repeat;
-  filter: saturate(1.1) brightness(0.85);
-  transform: scale(1.03);
-  transition: background-image 0.6s ease-in-out, transform 8s ease-in-out;
+  filter: brightness(0.65) contrast(1.08);
+  transform: scale(1.02);
+  transition: background-image 0.5s ease-in-out;
   z-index: 0;
 }
 
 .station-backdrop-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
+  background: radial-gradient(
+    circle at 75% 30%,
+    rgba(6, 6, 6, 0.2) 0%,
+    rgba(6, 6, 6, 0.75) 60%,
+    rgba(6, 6, 6, 0.95) 100%
+  ),
+  linear-gradient(
     to right,
-    rgba(6, 6, 6, 0.96) 0%,
-    rgba(6, 6, 6, 0.88) 42%,
-    rgba(6, 6, 6, 0.6) 75%,
+    rgba(6, 6, 6, 0.98) 0%,
+    rgba(6, 6, 6, 0.85) 45%,
     rgba(6, 6, 6, 0.4) 100%
+  ),
+  linear-gradient(
+    to top,
+    rgba(6, 6, 6, 0.98) 0%,
+    transparent 35%
   );
-  box-shadow: inset 0 0 150px rgba(0, 0, 0, 0.85);
   z-index: 1;
 }
 
@@ -275,79 +287,91 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 20px;
 }
 
 .station-logo-group {
   display: flex;
   align-items: center;
   gap: 16px;
+  min-width: 0;
 }
 
 .station-channel-num {
   font-size: 24px;
   font-weight: 900;
-  background: rgba(20, 20, 20, 0.8);
+  background: rgba(20, 20, 20, 0.85);
   backdrop-filter: blur(8px);
   color: #00FF66;
   padding: 6px 18px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1.5px solid rgba(0, 255, 102, 0.4);
   letter-spacing: 1px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  flex-shrink: 0;
 }
 
 .station-logo-img {
-  width: 60px;
-  height: 60px;
-  border-radius: 12px;
-  border: 2px solid #333;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
   object-fit: cover;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+  flex-shrink: 0;
 }
 
 .station-title-wrap {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .station-logo {
-  font-size: 56px;
+  font-size: 48px;
   font-weight: 900;
-  letter-spacing: -1.5px;
+  letter-spacing: -1px;
   color: #E50914;
   text-shadow: 0 0 20px rgba(229, 9, 20, 0.5);
+  white-space: nowrap;
 }
 
 .station-sublogo {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 800;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   color: #FFFFFF;
+  white-space: nowrap;
 }
 
 .station-meta-pills {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  max-width: 700px;
 }
 
 .station-genre-tag {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
   color: #E0E0E0;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.15);
   padding: 4px 12px;
   border-radius: 6px;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .station-mode-pill {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #AAA;
   letter-spacing: 1px;
+  white-space: nowrap;
 }
 
 .badge-live {
@@ -357,12 +381,13 @@ html, body {
   background-color: rgba(229, 9, 20, 0.35);
   border: 2px solid #E50914;
   color: #FFFFFF;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
-  padding: 8px 22px;
+  padding: 6px 20px;
   border-radius: 8px;
   letter-spacing: 2px;
   box-shadow: 0 0 25px rgba(229, 9, 20, 0.6);
+  flex-shrink: 0;
 }
 
 .badge-offline {
@@ -373,8 +398,8 @@ html, body {
 }
 
 .live-dot {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   background-color: #E50914;
   border-radius: 50%;
   box-shadow: 0 0 12px #FF0000;
@@ -388,30 +413,44 @@ html, body {
 }
 
 .station-content {
-  max-width: 1000px;
+  max-width: 950px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .station-program-title {
-  font-size: 64px;
+  font-size: 52px;
   font-weight: 900;
-  letter-spacing: -1px;
-  margin-bottom: 16px;
-  line-height: 1.12;
+  letter-spacing: -0.5px;
+  margin-bottom: 14px;
+  line-height: 1.15;
   color: #FFF;
   text-shadow: 0 2px 15px rgba(0,0,0,0.9);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-height: 125px;
 }
 
 .station-program-desc {
-  font-size: 26px;
+  font-size: 22px;
   color: #D4D4D4;
-  line-height: 1.45;
-  margin-bottom: 36px;
-  max-width: 900px;
+  line-height: 1.38;
+  margin-bottom: 28px;
+  max-width: 850px;
   text-shadow: 0 1px 8px rgba(0,0,0,0.9);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-height: 65px;
 }
 
 .fallback-container {
-  margin-bottom: 32px;
+  display: none !important;
 }
 
 .fallback-heading {

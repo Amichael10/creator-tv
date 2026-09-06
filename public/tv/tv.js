@@ -49,6 +49,8 @@
     hudTimer: null,
     isOnline: navigator.onLine !== false,
     debugMode: false,
+    currentVideoIndex: 0,
+    autoPlayTimer: null,
     ytPlayer: null,
     ytPlayerState: 'unloaded',
     lastPlayerError: null,
@@ -439,14 +441,25 @@
   function transitionToStation(slug) {
     slug = slug || state.currentStationSlug || 'arise';
     switchView('station');
-    loadStationData(slug);
+    
+    if (state.autoPlayTimer) clearTimeout(state.autoPlayTimer);
+
+    loadStationData(slug, function () {
+      // Auto-start playback on tune after 1.5s preview
+      state.autoPlayTimer = setTimeout(function () {
+        if (state.currentView === 'station' && !state.isGuideOpen) {
+          startPlayback();
+        }
+      }, 1500);
+    });
+
     if (state.stationRefreshTimer) clearInterval(state.stationRefreshTimer);
     state.stationRefreshTimer = setInterval(function () {
       loadStationData(state.currentStationSlug);
     }, 60000);
   }
 
-  function loadStationData(slug) {
+  function loadStationData(slug, callback) {
     slug = slug || state.currentStationSlug || 'arise';
     logEvent('STATION_LOAD', slug);
 
@@ -456,6 +469,7 @@
         state.stationData = data;
         renderStationUI(data);
         showNowPlayingHUD();
+        if (typeof callback === 'function') callback(data);
       })
       .catch(function (err) {
         logEvent('STATION_LOAD_ERROR', err.message);
@@ -471,18 +485,19 @@
     var logoEl = document.getElementById('station-logo-text');
     var sublogoEl = document.getElementById('station-sublogo-text');
     var genreEl = document.getElementById('station-genre-tag');
+    var modeTagEl = document.getElementById('station-mode-tag');
     var titleEl = document.getElementById('station-program-title');
     var descEl = document.getElementById('station-program-desc');
-    var fallbackCont = document.getElementById('fallback-container');
     var watchBtn = document.getElementById('btn-watch');
 
     var chFormatted = 'CH ' + (stationInfo.channelNumber ? (stationInfo.channelNumber < 10 ? '0' + stationInfo.channelNumber : stationInfo.channelNumber) : '01');
     if (chNumEl) chNumEl.textContent = chFormatted;
 
     // Set Dynamic High-Res Backdrop
+    var bgUrl = stationInfo.backdropUrl || stationInfo.logoUrl || '';
     if (backdropEl) {
-      if (stationInfo.backdropUrl) {
-        backdropEl.style.backgroundImage = 'url("' + stationInfo.backdropUrl + '")';
+      if (bgUrl) {
+        backdropEl.style.backgroundImage = 'url("' + bgUrl + '")';
       } else {
         backdropEl.style.backgroundImage = 'none';
       }
@@ -490,8 +505,9 @@
 
     // Set Station Logo
     if (logoImgEl) {
-      if (stationInfo.logoUrl) {
-        logoImgEl.src = stationInfo.logoUrl;
+      var logoSrc = stationInfo.logoUrl || stationInfo.backdropUrl || '';
+      if (logoSrc) {
+        logoImgEl.src = logoSrc;
         logoImgEl.style.display = 'block';
       } else {
         logoImgEl.style.display = 'none';
@@ -503,36 +519,31 @@
     if (logoEl) logoEl.textContent = nameParts[0] || 'CREATOR';
     if (sublogoEl) sublogoEl.textContent = nameParts.slice(1).join(' ') || 'TV';
 
-    if (genreEl) genreEl.textContent = (stationInfo.category ? stationInfo.category.toUpperCase() : 'BROADCAST') + ' • ' + (stationInfo.tagline || '');
+    // Only genre/category in the pill (do not append huge description)
+    if (genreEl) genreEl.textContent = (stationInfo.category ? stationInfo.category.toUpperCase() : 'BROADCAST');
+    if (modeTagEl) modeTagEl.textContent = (data.live || stationInfo.mode === 'live-first') ? '24/7 LIVE STREAM' : 'CONTINUOUS BROADCAST';
+
+    var topVideo = data.fallback && data.fallback.length > 0 ? data.fallback[state.currentVideoIndex || 0] : null;
 
     if (data.live && data.current) {
       logEvent('YOUTUBE_LIVE_FOUND', data.current.videoId);
       badgeEl.className = 'badge-live';
       badgeEl.innerHTML = '<span class="live-dot"></span> LIVE';
       titleEl.textContent = data.current.title || (stationInfo.name + ' LIVE');
-      descEl.textContent = stationInfo.tagline || 'Active 24-hour broadcast.';
-      fallbackCont.style.display = 'none';
+      descEl.textContent = stationInfo.tagline || 'Active 24-hour live broadcast.';
       watchBtn.textContent = '▶ WATCH LIVE';
     } else {
-      logEvent('YOUTUBE_LIVE_NOT_FOUND', 'fallback mode');
+      logEvent('YOUTUBE_LIVE_NOT_FOUND', 'continuous playback mode');
       badgeEl.className = 'badge-live badge-offline';
-      badgeEl.textContent = 'SCHEDULED / RECENT';
+      badgeEl.textContent = 'CONTINUOUS PLAY';
 
-      var topVideo = data.fallback && data.fallback.length > 0 ? data.fallback[0] : null;
       if (topVideo) {
         titleEl.textContent = topVideo.title || stationInfo.name;
-        descEl.textContent = stationInfo.tagline || 'Latest programming and segments.';
-        fallbackCont.style.display = 'block';
-        document.getElementById('fallback-title').textContent = topVideo.title;
-        document.getElementById('fallback-date').textContent = topVideo.publishedAt ? new Date(topVideo.publishedAt).toLocaleDateString() : '';
-        if (topVideo.thumbnail) {
-          document.getElementById('fallback-thumbnail').src = topVideo.thumbnail;
-        }
+        descEl.textContent = stationInfo.tagline || 'Continuous broadcast programming.';
         watchBtn.textContent = '▶ WATCH NOW';
       } else {
         titleEl.textContent = stationInfo.name;
         descEl.textContent = stationInfo.tagline || '24-hour programming.';
-        fallbackCont.style.display = 'none';
         watchBtn.textContent = '▶ WATCH NOW';
       }
     }
@@ -545,10 +556,14 @@
     var stationInfo = (state.stationData && state.stationData.station) ? state.stationData.station : {};
     var chFormatted = 'CH ' + (stationInfo.channelNumber ? (stationInfo.channelNumber < 10 ? '0' + stationInfo.channelNumber : stationInfo.channelNumber) : '01');
 
+    var currentVideo = (state.stationData && state.stationData.current) 
+      ? state.stationData.current 
+      : (state.stationData && state.stationData.fallback && state.stationData.fallback.length > 0 ? state.stationData.fallback[state.currentVideoIndex || 0] : null);
+
     document.getElementById('hud-channel-num').textContent = chFormatted;
     document.getElementById('hud-station-title').textContent = stationInfo.name || 'CreatorTV';
-    document.getElementById('hud-program-title').textContent = (state.stationData && state.stationData.current) ? state.stationData.current.title : (stationInfo.tagline || 'Live Stream');
-    document.getElementById('hud-live-tag').textContent = (state.stationData && state.stationData.live) ? '● LIVE' : '● BROADCAST';
+    document.getElementById('hud-program-title').textContent = currentVideo ? currentVideo.title : (stationInfo.tagline || 'Broadcast Stream');
+    document.getElementById('hud-live-tag').textContent = (state.stationData && state.stationData.live) ? '● LIVE' : '● 24/7 TV';
 
     hud.classList.add('visible');
     if (state.hudTimer) clearTimeout(state.hudTimer);
@@ -579,13 +594,21 @@
       '</div>';
     }).join('');
 
-    // Bind card click
+    // Bind card click & keydown for seamless channel switching
     var cards = list.querySelectorAll('.guide-channel-card');
     for (var i = 0; i < cards.length; i++) {
       cards[i].addEventListener('click', function () {
         var slug = this.getAttribute('data-station');
         tuneToStation(slug);
         toggleTVGuide(false);
+      });
+      cards[i].addEventListener('keydown', function (e) {
+        if (e.keyCode === 13 || e.key === 'Enter') {
+          e.preventDefault();
+          var slug = this.getAttribute('data-station');
+          tuneToStation(slug);
+          toggleTVGuide(false);
+        }
       });
     }
   }
@@ -599,7 +622,7 @@
       drawer.classList.add('open');
       renderTVGuideList();
       setTimeout(function () {
-        var activeCard = drawer.querySelector('.guide-channel-card.active-station');
+        var activeCard = drawer.querySelector('.guide-channel-card.active-station') || drawer.querySelector('.guide-channel-card');
         if (activeCard) {
           FocusManager.setFocus(activeCard);
         } else {
@@ -617,11 +640,13 @@
   function tuneToStation(slug) {
     if (!slug) return;
     state.currentStationSlug = slug;
+    state.currentVideoIndex = 0;
     logEvent('TUNE_STATION', slug);
+
     if (state.currentView === 'player') {
-      closePlayer();
-      transitionToStation(slug);
-      setTimeout(startPlayback, 300);
+      loadStationData(slug, function () {
+        startPlayback();
+      });
     } else {
       transitionToStation(slug);
     }
@@ -668,13 +693,15 @@
     };
   }
 
-  function startPlayback() {
-    var videoId = null;
-    if (state.stationData) {
+  function startPlayback(customVideoId) {
+    var videoId = customVideoId || null;
+    if (!videoId && state.stationData) {
       if (state.stationData.live && state.stationData.current) {
         videoId = state.stationData.current.videoId;
       } else if (state.stationData.fallback && state.stationData.fallback.length > 0) {
-        videoId = state.stationData.fallback[0].videoId;
+        var idx = state.currentVideoIndex || 0;
+        if (idx >= state.stationData.fallback.length) idx = 0;
+        videoId = state.stationData.fallback[idx].videoId;
       }
     }
 
@@ -692,6 +719,31 @@
     loadYouTubeIframeApi(function () {
       initPlayer(videoId);
     });
+  }
+
+  function playNextVideoInQueue() {
+    var queue = [];
+    if (state.stationData && state.stationData.fallback && state.stationData.fallback.length > 0) {
+      queue = state.stationData.fallback;
+    }
+
+    if (queue.length > 1) {
+      state.currentVideoIndex = (state.currentVideoIndex + 1) % queue.length;
+      var nextVid = queue[state.currentVideoIndex];
+      logEvent('PLAYLIST_AUTO_ADVANCE', { index: state.currentVideoIndex, videoId: nextVid.videoId, title: nextVid.title });
+      
+      showNowPlayingHUD();
+      if (state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
+        state.ytPlayer.loadVideoById(nextVid.videoId);
+      } else {
+        initPlayer(nextVid.videoId);
+      }
+    } else {
+      // If single video or live channel, refresh and replay
+      loadStationData(state.currentStationSlug, function () {
+        startPlayback();
+      });
+    }
   }
 
   function initPlayer(videoId) {
@@ -754,6 +806,13 @@
     if (current === 'playing') {
       document.getElementById('player-loading-overlay').style.display = 'none';
     }
+
+    // Auto-advance to next video when current ends (Continuous Broadcast TV)
+    if (current === 'ended' || event.data === 0) {
+      logEvent('VIDEO_ENDED_AUTO_ADVANCE');
+      setTimeout(playNextVideoInQueue, 800);
+    }
+
     updateDebugUI();
   }
 
