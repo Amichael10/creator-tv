@@ -1,14 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  async rewrites() {
-    return [
-      {
-        source: '/tv',
-        destination: '/tv/index.html',
-      },
-    ];
-  },
   async headers() {
     return [
       {
