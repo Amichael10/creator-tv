@@ -10,6 +10,7 @@
 
   <!-- View 1: Initial Pairing Screen with QR Code + 6-Char Code -->
   <div id="view-pairing" class="tv-view active">
+    <div class="pairing-backdrop"></div>
     <div class="tv-safe-zone pairing-layout">
       <div class="tv-brand-header">
         <span class="tv-badge">CREATOR TV</span>
@@ -48,14 +49,21 @@
     </div>
   </div>
 
-  <!-- View 2: Paired Station Screen (Multi-Station Broadcast Mode) -->
+  <!-- View 2: Paired Station Screen (Cinematic Broadcast Layout) -->
   <div id="view-station" class="tv-view">
+    <!-- High-Resolution Station Backdrop & Gradient Layers -->
+    <div id="station-backdrop-bg" class="station-backdrop-bg"></div>
+    <div class="station-backdrop-overlay"></div>
+
     <div class="tv-safe-zone station-layout">
       <div class="station-header">
         <div class="station-logo-group">
           <div id="station-channel-num" class="station-channel-num">CH 01</div>
-          <div id="station-logo-text" class="station-logo">ARISE</div>
-          <div id="station-sublogo-text" class="station-sublogo">NEWS</div>
+          <img id="station-logo-img" class="station-logo-img" src="" alt="Logo" style="display: none;" />
+          <div class="station-title-wrap">
+            <div id="station-logo-text" class="station-logo">ARISE</div>
+            <div id="station-sublogo-text" class="station-sublogo">NEWS</div>
+          </div>
         </div>
         <div id="station-badge" class="badge-live">
           <span class="live-dot"></span> LIVE
@@ -63,7 +71,11 @@
       </div>
 
       <div class="station-content">
-        <div id="station-genre-tag" class="station-genre-tag">NEWS & POLITICS</div>
+        <div class="station-meta-pills">
+          <span id="station-genre-tag" class="station-genre-tag">NEWS & POLITICS</span>
+          <span id="station-mode-tag" class="station-mode-pill">24/7 BROADCAST</span>
+        </div>
+
         <h2 id="station-program-title" class="station-program-title">ARISE NEWS LIVE</h2>
         <p id="station-program-desc" class="station-program-desc">
           24-hour breaking news, politics, business and current affairs broadcast globally.
@@ -92,8 +104,8 @@
 
       <div class="station-footer">
         <div class="footer-left">
-          <span class="footer-tag">CreatorTV Station Mode</span>
-          <span class="footer-tip">Press [▲ / ▼ / CH+/-] to change channel • Press [MENU] for TV Guide</span>
+          <span class="footer-tag">CreatorTV Broadcast Engine</span>
+          <span class="footer-tip">Move cursor down or press [▲ / MENU] for TV Guide • [CH+/-] to flip channels</span>
         </div>
         <div id="station-clock" class="station-clock">12:00 PM</div>
       </div>
@@ -135,23 +147,26 @@
     </div>
   </div>
 
-  <!-- TV Guide Overlay Drawer (Toggle via Remote Menu / Up) -->
-  <div id="tv-guide-overlay" class="tv-guide-overlay" style="display: none;">
-    <div class="guide-backdrop"></div>
-    <div class="guide-panel">
-      <div class="guide-header">
-        <div class="guide-title-group">
-          <span class="guide-badge">CREATORTV</span>
-          <h2>Live TV Guide & Channel Lineup</h2>
-        </div>
-        <button id="btn-close-guide" class="guide-close-btn" data-focusable="true">✕ CLOSE</button>
-      </div>
-      
-      <p class="guide-instructions">Use [◀ / ▶] to select a station • Press [OK / ENTER] to tune TV</p>
+  <!-- TV Guide Hover Trigger Area at Screen Bottom -->
+  <div id="guide-hover-trigger" class="guide-hover-trigger" title="Move cursor here or press UP on remote for TV Guide">
+    <div class="guide-hover-bar">
+      <span>▲ TV GUIDE & CHANNELS</span>
+    </div>
+  </div>
 
-      <div id="guide-channel-list" class="guide-channel-list">
-        <!-- Dynamically rendered station cards -->
+  <!-- TV Guide Sliding Bottom Drawer -->
+  <div id="tv-guide-drawer" class="tv-guide-drawer">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <span class="drawer-badge">CREATORTV</span>
+        <h2>Live Channel Lineup</h2>
+        <span class="drawer-sub">Select a channel with remote D-pad or mouse click</span>
       </div>
+      <button id="btn-close-guide" class="drawer-close-btn" data-focusable="true">✕ HIDE</button>
+    </div>
+
+    <div id="guide-channel-list" class="guide-channel-list">
+      <!-- Dynamically rendered rich station tiles -->
     </div>
   </div>
 

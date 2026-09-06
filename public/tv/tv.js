@@ -73,7 +73,7 @@
 
     getFocusableElements: function () {
       var container = state.isGuideOpen 
-        ? document.getElementById('tv-guide-overlay') 
+        ? document.getElementById('tv-guide-drawer') 
         : document.querySelector('.tv-view.active');
       
       if (!container) return [];
@@ -97,6 +97,9 @@
         FocusManager.current = el;
         el.classList.add('is-focused');
         el.focus();
+        if (typeof el.scrollIntoView === 'function') {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
         logEvent('FOCUS_SET', el.id || el.getAttribute('data-station') || el.tagName);
       }
       updateDebugUI();
@@ -128,6 +131,13 @@
       if (matchesKey(e, TVKeys.MENU)) {
         e.preventDefault();
         toggleTVGuide();
+        return;
+      }
+
+      // If on Station view and user presses UP on remote, open Guide Drawer
+      if (state.currentView === 'station' && !state.isGuideOpen && matchesKey(e, TVKeys.UP)) {
+        e.preventDefault();
+        toggleTVGuide(true);
         return;
       }
 
@@ -186,6 +196,13 @@
 
       var currentIndex = elements.indexOf(FocusManager.current);
       var nextIndex = currentIndex;
+
+      // When guide is open, DOWN key closes it
+      if (state.isGuideOpen && matchesKey(e, TVKeys.DOWN)) {
+        e.preventDefault();
+        toggleTVGuide(false);
+        return;
+      }
 
       if (matchesKey(e, TVKeys.RIGHT) || matchesKey(e, TVKeys.DOWN)) {
         e.preventDefault();
@@ -447,8 +464,10 @@
 
   function renderStationUI(data) {
     var stationInfo = data.station || {};
+    var backdropEl = document.getElementById('station-backdrop-bg');
     var badgeEl = document.getElementById('station-badge');
     var chNumEl = document.getElementById('station-channel-num');
+    var logoImgEl = document.getElementById('station-logo-img');
     var logoEl = document.getElementById('station-logo-text');
     var sublogoEl = document.getElementById('station-sublogo-text');
     var genreEl = document.getElementById('station-genre-tag');
@@ -459,6 +478,25 @@
 
     var chFormatted = 'CH ' + (stationInfo.channelNumber ? (stationInfo.channelNumber < 10 ? '0' + stationInfo.channelNumber : stationInfo.channelNumber) : '01');
     if (chNumEl) chNumEl.textContent = chFormatted;
+
+    // Set Dynamic High-Res Backdrop
+    if (backdropEl) {
+      if (stationInfo.backdropUrl) {
+        backdropEl.style.backgroundImage = 'url("' + stationInfo.backdropUrl + '")';
+      } else {
+        backdropEl.style.backgroundImage = 'none';
+      }
+    }
+
+    // Set Station Logo
+    if (logoImgEl) {
+      if (stationInfo.logoUrl) {
+        logoImgEl.src = stationInfo.logoUrl;
+        logoImgEl.style.display = 'block';
+      } else {
+        logoImgEl.style.display = 'none';
+      }
+    }
 
     // Split name for station header styling
     var nameParts = (stationInfo.name || 'CREATOR TV').split(' ');
@@ -526,13 +564,18 @@
     list.innerHTML = state.allStations.map(function (st) {
       var isCur = (st.slug === state.currentStationSlug);
       var chStr = 'CH ' + (st.channelNumber < 10 ? '0' + st.channelNumber : st.channelNumber);
+      var bgImg = st.backdropUrl || st.logoUrl || '';
       return '<div class="guide-channel-card ' + (isCur ? 'active-station' : '') + '" data-focusable="true" data-station="' + st.slug + '" tabindex="0">' +
-        '<div class="guide-card-top">' +
-          '<span class="guide-card-ch">' + chStr + '</span>' +
-          '<span class="guide-card-cat">' + st.category + '</span>' +
+        '<div class="guide-card-preview" style="' + (bgImg ? 'background-image: url(' + bgImg + ');' : '') + '">' +
+          '<div class="guide-card-preview-overlay">' +
+            '<span class="guide-card-ch">' + chStr + '</span>' +
+            '<span class="guide-card-cat">' + (st.category || 'CHANNEL') + '</span>' +
+          '</div>' +
         '</div>' +
-        '<div class="guide-card-name">' + st.name + '</div>' +
-        '<div class="guide-card-tagline">' + st.tagline + '</div>' +
+        '<div class="guide-card-body">' +
+          '<div class="guide-card-name">' + st.name + '</div>' +
+          '<div class="guide-card-tagline">' + (st.tagline || '') + '</div>' +
+        '</div>' +
       '</div>';
     }).join('');
 
@@ -548,21 +591,26 @@
   }
 
   function toggleTVGuide(force) {
-    var guide = document.getElementById('tv-guide-overlay');
-    if (!guide) return;
+    var drawer = document.getElementById('tv-guide-drawer');
+    if (!drawer) return;
 
     state.isGuideOpen = (typeof force === 'boolean') ? force : !state.isGuideOpen;
-    guide.style.display = state.isGuideOpen ? 'flex' : 'none';
-
     if (state.isGuideOpen) {
+      drawer.classList.add('open');
       renderTVGuideList();
       setTimeout(function () {
-        FocusManager.restoreInitialFocus();
-      }, 50);
+        var activeCard = drawer.querySelector('.guide-channel-card.active-station');
+        if (activeCard) {
+          FocusManager.setFocus(activeCard);
+        } else {
+          FocusManager.restoreInitialFocus();
+        }
+      }, 60);
     } else {
+      drawer.classList.remove('open');
       setTimeout(function () {
         FocusManager.restoreInitialFocus();
-      }, 50);
+      }, 60);
     }
   }
 
@@ -832,6 +880,30 @@
 
     var closeGuideBtn = document.getElementById('btn-close-guide');
     if (closeGuideBtn) closeGuideBtn.addEventListener('click', function () { toggleTVGuide(false); });
+
+    // Hover trigger bar at screen bottom
+    var hoverTrigger = document.getElementById('guide-hover-trigger');
+    if (hoverTrigger) {
+      hoverTrigger.addEventListener('mouseenter', function () { toggleTVGuide(true); });
+      hoverTrigger.addEventListener('click', function () { toggleTVGuide(true); });
+    }
+
+    // Auto-close drawer on mouse leave
+    var drawer = document.getElementById('tv-guide-drawer');
+    if (drawer) {
+      drawer.addEventListener('mouseleave', function () {
+        toggleTVGuide(false);
+      });
+    }
+
+    // Screen-edge mouse detection
+    window.addEventListener('mousemove', function (e) {
+      if (state.currentView === 'station' && !state.isGuideOpen) {
+        if (e.clientY >= (window.innerHeight - 35)) {
+          toggleTVGuide(true);
+        }
+      }
+    });
 
     var retryBtn = document.getElementById('btn-player-retry');
     if (retryBtn) retryBtn.addEventListener('click', startPlayback);

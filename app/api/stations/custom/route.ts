@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { StationDefinition } from '@/lib/stations';
+import { StationDefinition, registerCustomStation, getAllStations } from '@/lib/stations';
 import { resolveStationState } from '@/lib/youtube';
 
 export const dynamic = 'force-dynamic';
@@ -7,14 +7,17 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const rawInput = (body?.handle || body?.url || '').trim();
+    const rawInput = (body?.handle || body?.url || body?.query || '').trim();
+    const customTitle = body?.title;
+    const bannerUrl = body?.bannerUrl;
+    const logoUrl = body?.avatarUrl || body?.logoUrl;
+    const category = body?.category || 'creator';
 
-    if (!rawInput) {
-      return NextResponse.json({ error: 'Please provide a YouTube handle or URL' }, { status: 400 });
+    if (!rawInput && !customTitle) {
+      return NextResponse.json({ error: 'Please provide a channel name, handle, or URL' }, { status: 400 });
     }
 
-    // Extract handle or clean name
-    let handle = rawInput;
+    let handle = rawInput || (customTitle ? `@${customTitle.replace(/\s+/g, '')}` : '@creator');
     if (handle.includes('youtube.com/')) {
       const match = handle.match(/@(.*?)(?:\/|\?|$)/);
       if (match) {
@@ -25,18 +28,22 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanSlug = 'custom-' + handle.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
+    const existingCount = getAllStations().length;
 
     const customStation: StationDefinition = {
       slug: cleanSlug,
-      name: `Channel ${handle}`,
-      tagline: `Direct creator channel for ${handle}`,
-      category: 'creator',
+      name: customTitle || `Channel ${handle}`,
+      tagline: body?.description || `Continuous broadcast from ${handle}`,
+      category: category,
       youtubeHandle: handle,
       mode: 'continuous',
-      accentColor: '#E50914',
-      channelNumber: 99,
+      accentColor: body?.accentColor || '#E50914',
+      channelNumber: existingCount + 1,
+      backdropUrl: bannerUrl || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1920&q=85&fit=crop',
+      logoUrl: logoUrl,
     };
 
+    registerCustomStation(customStation);
     const result = await resolveStationState(customStation);
 
     return NextResponse.json({
