@@ -235,20 +235,20 @@ function ConnectContent() {
               </p>
             </div>
 
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={code}
-                onChange={handleCodeChange}
-                placeholder="A7K92P"
-                maxLength={6}
-                autoFocus
-                className="w-full bg-[#1c1c1c] border-2 border-[#333] focus:border-red-600 focus:outline-none rounded-2xl py-4 text-center text-3xl font-mono font-bold tracking-widest text-white uppercase transition-colors"
-              />
-              <p className="text-xs text-gray-500 text-center">
-                Letters & numbers only (0, O, 1, I excluded)
-              </p>
-            </div>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={code}
+                  onChange={handleCodeChange}
+                  placeholder="TV CODE"
+                  maxLength={6}
+                  autoFocus
+                  className="w-full bg-[#1c1c1c] border-2 border-[#333] focus:border-red-600 focus:outline-none rounded-2xl py-4 text-center text-3xl font-mono font-bold tracking-widest text-white uppercase transition-colors placeholder:text-gray-600"
+                />
+                <p className="text-xs text-gray-500 text-center">
+                  Look at your TV screen for the 6-character code
+                </p>
+              </div>
 
             <button
               type="submit"

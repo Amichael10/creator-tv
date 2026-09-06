@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { sanitizePairCode } from '@/lib/pairing';
 import { isValidStation, getStation } from '@/lib/stations';
+import { memoryDeviceStore } from '@/lib/memory-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,35 +11,50 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const rawCode = body?.pairCode;
     const deviceId = body?.deviceId;
-    const action = body?.action; // 'TUNE_STATION' | 'PLAY' | 'PAUSE' | 'NEXT' | 'MUTE'
+    const action = body?.action;
     const payload = body?.payload || {};
 
     if (!action) {
       return NextResponse.json({ error: 'Missing command action' }, { status: 400 });
     }
 
-    let query = supabaseAdmin.from('devices').select('id, paired, station_slug');
-    if (deviceId) {
-      query = query.eq('id', deviceId);
-    } else if (rawCode) {
-      const pairCode = sanitizePairCode(rawCode);
-      query = query.eq('pair_code', pairCode);
-    } else {
-      return NextResponse.json({ error: 'Missing device identifier or pair code' }, { status: 400 });
+    let device: any = null;
+
+    // 1. Try Supabase
+    try {
+      let query = supabaseAdmin.from('devices').select('id, paired, station_slug');
+      if (deviceId) {
+        query = query.eq('id', deviceId);
+      } else if (rawCode) {
+        const pairCode = sanitizePairCode(rawCode);
+        query = query.eq('pair_code', pairCode);
+      }
+      const { data, error } = await query.single();
+      if (!error && data) device = data;
+    } catch (e) {}
+
+    // 2. Fallback to memory store
+    if (!device) {
+      if (deviceId) {
+        device = memoryDeviceStore.getById(deviceId);
+      } else if (rawCode) {
+        device = memoryDeviceStore.getByPairCode(sanitizePairCode(rawCode));
+      }
     }
 
-    const { data: device, error } = await query.single();
-    if (error || !device) {
+    if (!device) {
       return NextResponse.json({ error: 'Connected TV not found' }, { status: 404 });
     }
 
+    const commandObj = {
+      id: Math.random().toString(36).substring(2, 9),
+      action,
+      payload,
+      timestamp: Date.now(),
+    };
+
     const updateData: any = {
-      pending_command: {
-        id: Math.random().toString(36).substring(2, 9),
-        action,
-        payload,
-        timestamp: Date.now(),
-      },
+      pending_command: commandObj,
       last_command_at: new Date().toISOString(),
     };
 
@@ -49,15 +65,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from('devices')
-      .update(updateData)
-      .eq('id', device.id);
+    // Update in Supabase & memory store
+    try {
+      await supabaseAdmin
+        .from('devices')
+        .update(updateData)
+        .eq('id', device.id);
+    } catch (e) {}
 
-    if (updateError) {
-      console.error('[Device Command API] Update error:', updateError);
-      return NextResponse.json({ error: 'Failed to dispatch command to TV' }, { status: 500 });
-    }
+    memoryDeviceStore.update(device.id, updateData);
 
     return NextResponse.json({
       success: true,

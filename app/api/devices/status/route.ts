@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { verifyDeviceSecret } from '@/lib/device-auth';
 import { generatePairCode } from '@/lib/pairing';
 import { getStation } from '@/lib/stations';
+import { memoryDeviceStore } from '@/lib/memory-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,13 +16,29 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Missing device credentials' }, { status: 401 });
     }
 
-    const { data: device, error } = await supabaseAdmin
-      .from('devices')
-      .select('id, device_secret_hash, paired, station_slug, pair_code, pair_code_expires_at, pending_command')
-      .eq('id', deviceId)
-      .single();
+    let device: any = null;
 
-    if (error || !device) {
+    // 1. Try Supabase
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('devices')
+        .select('id, device_secret_hash, paired, station_slug, pair_code, pair_code_expires_at, pending_command')
+        .eq('id', deviceId)
+        .single();
+
+      if (!error && data) {
+        device = data;
+      }
+    } catch (dbErr) {
+      // ignore, fall to memory store
+    }
+
+    // 2. Fallback to memory store
+    if (!device) {
+      device = memoryDeviceStore.getById(deviceId);
+    }
+
+    if (!device) {
       return NextResponse.json({ error: 'Device not found' }, { status: 404 });
     }
 
@@ -33,12 +50,15 @@ export async function GET(req: NextRequest) {
       const station = getStation(device.station_slug);
       const pendingCommand = device.pending_command;
 
-      // If there was a pending command, clear it atomically so it only triggers once on the TV
+      // Clear pending command after dispatch
       if (pendingCommand) {
-        await supabaseAdmin
-          .from('devices')
-          .update({ pending_command: null })
-          .eq('id', device.id);
+        try {
+          await supabaseAdmin
+            .from('devices')
+            .update({ pending_command: null })
+            .eq('id', device.id);
+        } catch (e) {}
+        memoryDeviceStore.update(device.id, { pending_command: null });
       }
 
       return NextResponse.json({
@@ -70,13 +90,19 @@ export async function GET(req: NextRequest) {
       currentPairCode = generatePairCode(6);
       currentExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-      await supabaseAdmin
-        .from('devices')
-        .update({
-          pair_code: currentPairCode,
-          pair_code_expires_at: currentExpiresAt,
-        })
-        .eq('id', device.id);
+      try {
+        await supabaseAdmin
+          .from('devices')
+          .update({
+            pair_code: currentPairCode,
+            pair_code_expires_at: currentExpiresAt,
+          })
+          .eq('id', device.id);
+      } catch (e) {}
+      memoryDeviceStore.update(device.id, {
+        pair_code: currentPairCode,
+        pair_code_expires_at: currentExpiresAt,
+      });
     }
 
     return NextResponse.json({

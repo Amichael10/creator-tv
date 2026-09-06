@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { sanitizePairCode, isValidPairCodeFormat } from '@/lib/pairing';
 import { isValidStation, getStation } from '@/lib/stations';
+import { memoryDeviceStore } from '@/lib/memory-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,14 +23,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unknown or unsupported station' }, { status: 400 });
     }
 
-    const { data: device, error } = await supabaseAdmin
-      .from('devices')
-      .select('id, paired, pair_code_expires_at')
-      .eq('pair_code', pairCode)
-      .single();
+    let device: any = null;
 
-    if (error || !device) {
-      return NextResponse.json({ error: 'That code could not be found.' }, { status: 404 });
+    // 1. Try Supabase
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('devices')
+        .select('id, paired, pair_code_expires_at')
+        .eq('pair_code', pairCode)
+        .single();
+
+      if (!error && data) {
+        device = data;
+      }
+    } catch (e) {}
+
+    // 2. Fallback to memory store
+    if (!device) {
+      device = memoryDeviceStore.getByPairCode(pairCode);
+    }
+
+    if (!device) {
+      return NextResponse.json({ error: 'That code could not be found. Please check your TV screen.' }, { status: 404 });
     }
 
     if (device.paired) {
@@ -41,19 +56,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'That code has expired. Please check your TV screen.' }, { status: 410 });
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from('devices')
-      .update({
-        paired: true,
-        station_slug: stationSlug,
-        paired_at: new Date().toISOString(),
-      })
-      .eq('id', device.id);
+    // Update in Supabase & memory store
+    try {
+      await supabaseAdmin
+        .from('devices')
+        .update({
+          paired: true,
+          station_slug: stationSlug,
+          paired_at: new Date().toISOString(),
+        })
+        .eq('id', device.id);
+    } catch (e) {}
 
-    if (updateError) {
-      console.error('[Pair API] Update error:', updateError);
-      return NextResponse.json({ error: 'Failed to pair device' }, { status: 500 });
-    }
+    memoryDeviceStore.update(device.id, {
+      paired: true,
+      station_slug: stationSlug,
+      paired_at: new Date().toISOString(),
+    });
 
     const station = getStation(stationSlug)!;
 

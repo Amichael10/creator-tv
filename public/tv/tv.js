@@ -255,6 +255,7 @@
     logEvent('APP_START');
     fetchStationCatalog();
     startClock();
+    renderPairingCode(null);
 
     var storedId = localStorage.getItem('creatorTvDeviceId');
     var storedSecret = localStorage.getItem('creatorTvDeviceSecret');
@@ -293,8 +294,8 @@
       })
       .catch(function (err) {
         logEvent('DEVICE_REGISTER_ERROR', err.message);
-        document.getElementById('pairing-status-text').textContent = 'Registration retry in 5s...';
-        setTimeout(registerNewDevice, 5000);
+        document.getElementById('pairing-status-text').textContent = 'Connecting to server (retry in 2s)...';
+        setTimeout(registerNewDevice, 2000);
       });
   }
 
@@ -305,6 +306,11 @@
     var origin = window.location.origin;
     var urlEl = document.getElementById('connect-url-display');
     if (urlEl) urlEl.textContent = origin + '/connect';
+
+    var statusEl = document.getElementById('pairing-status-text');
+    if (code && statusEl) {
+      statusEl.textContent = 'Waiting for phone connection...';
+    }
 
     // Render QR Code
     if (window.TVQRCode && code) {
