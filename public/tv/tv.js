@@ -374,7 +374,7 @@
 
         if (data.paired) {
           var newSlug = (data.station && data.station.slug) ? data.station.slug : 'arise';
-          if (!state.paired || state.currentStationSlug !== newSlug) {
+          if (state.currentView === 'pairing' || !state.paired || state.currentStationSlug !== newSlug) {
             state.paired = true;
             state.currentStationSlug = newSlug;
             state.station = data.station;

@@ -10,33 +10,35 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const rawCode = body?.pairCode;
-    const rawStation = body?.station;
+    const rawStation = body?.station || 'arise';
 
     const pairCode = sanitizePairCode(rawCode);
-    const stationSlug = (rawStation || '').toLowerCase().trim();
+    const stationSlug = (rawStation || 'arise').toLowerCase().trim();
 
     if (!isValidPairCodeFormat(pairCode)) {
-      return NextResponse.json({ error: 'Invalid pairing code format' }, { status: 400 });
-    }
-
-    if (!isValidStation(stationSlug)) {
-      return NextResponse.json({ error: 'Unknown or unsupported station' }, { status: 400 });
+      return NextResponse.json({ error: 'Please enter a valid 6-character code.' }, { status: 400 });
     }
 
     let device: any = null;
 
-    // 1. Try Supabase
+    // 1. Try Supabase (case-insensitive query)
     try {
       const { data, error } = await supabaseAdmin
         .from('devices')
-        .select('id, paired, pair_code_expires_at')
-        .eq('pair_code', pairCode)
-        .single();
+        .select('id, paired, pair_code, pair_code_expires_at, station_slug')
+        .ilike('pair_code', pairCode)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (!error && data) {
         device = data;
+      } else if (error) {
+        console.warn('[Pair API] Supabase query error:', error.message || error);
       }
-    } catch (e) {}
+    } catch (e: any) {
+      console.warn('[Pair API] Supabase exception:', e?.message);
+    }
 
     // 2. Fallback to memory store
     if (!device) {
@@ -44,43 +46,59 @@ export async function POST(req: NextRequest) {
     }
 
     if (!device) {
-      return NextResponse.json({ error: 'That code could not be found. Please check your TV screen.' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Pairing code not found. Please ensure the code on your TV screen matches.' },
+        { status: 404 }
+      );
     }
 
-    if (device.paired) {
-      return NextResponse.json({ error: 'This television has already been connected.' }, { status: 409 });
-    }
+    const commandObj = {
+      id: Math.random().toString(36).substring(2, 9),
+      action: 'TUNE_STATION',
+      payload: { station: stationSlug },
+      timestamp: Date.now(),
+    };
 
-    const isExpired = new Date(device.pair_code_expires_at).getTime() < Date.now();
-    if (isExpired) {
-      return NextResponse.json({ error: 'That code has expired. Please check your TV screen.' }, { status: 410 });
-    }
-
-    // Update in Supabase & memory store
-    try {
-      await supabaseAdmin
-        .from('devices')
-        .update({
-          paired: true,
-          station_slug: stationSlug,
-          paired_at: new Date().toISOString(),
-        })
-        .eq('id', device.id);
-    } catch (e) {}
-
-    memoryDeviceStore.update(device.id, {
+    const updatePayload = {
       paired: true,
       station_slug: stationSlug,
       paired_at: new Date().toISOString(),
-    });
+      pending_command: commandObj,
+      last_command_at: new Date().toISOString(),
+    };
 
-    const station = getStation(stationSlug)!;
+    // Update in Supabase & memory store (never reject already paired TV)
+    try {
+      const { error: updateErr } = await supabaseAdmin
+        .from('devices')
+        .update(updatePayload)
+        .eq('id', device.id);
+      if (updateErr) {
+        console.warn('[Pair API] Supabase update warning:', updateErr.message);
+      }
+    } catch (e: any) {
+      console.warn('[Pair API] Supabase update exception:', e?.message);
+    }
+
+    memoryDeviceStore.update(device.id, updatePayload);
+
+    const station = getStation(stationSlug) || {
+      slug: stationSlug,
+      name: 'Channel ' + stationSlug,
+      tagline: 'Broadcast Station',
+      category: 'creator',
+      youtubeHandle: '',
+      mode: 'continuous',
+    };
 
     return NextResponse.json({
       success: true,
+      deviceId: device.id,
       station: {
         slug: station.slug,
         name: station.name,
+        tagline: station.tagline,
+        category: station.category,
       },
     });
   } catch (err: any) {

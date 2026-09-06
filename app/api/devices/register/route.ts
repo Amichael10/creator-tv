@@ -12,7 +12,7 @@ export async function POST() {
     let pairCode = generatePairCode(6);
     const deviceSecret = generateDeviceSecret();
     const secretHash = hashDeviceSecret(deviceSecret);
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour expiration for stability
 
     let inserted = false;
     let newDevice: any = null;
@@ -39,11 +39,14 @@ export async function POST() {
         } else if (error && error.code === '23505') {
           pairCode = generatePairCode(6);
         } else {
+          if (error) {
+            console.error('[Device Register] Supabase insert error:', error.message || error);
+          }
           break; // Fall through to memory store
         }
       }
-    } catch (dbErr) {
-      console.warn('[Device Register] Supabase unavailable, using in-memory store:', dbErr);
+    } catch (dbErr: any) {
+      console.warn('[Device Register] Supabase unavailable, using in-memory store:', dbErr?.message || dbErr);
     }
 
     // 2. Seamless fallback to in-memory store if DB is not yet migrated

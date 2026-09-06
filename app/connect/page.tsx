@@ -39,7 +39,7 @@ function ConnectContent() {
   const searchParams = useSearchParams();
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'code' | 'main'>('code');
-  const [activeTab, setActiveTab] = useState<'search' | 'guide' | 'remote'>('search');
+  const [activeTab, setActiveTab] = useState<'search' | 'guide' | 'remote'>('guide');
   const [activeStation, setActiveStation] = useState<Station | null>(null);
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -49,6 +49,7 @@ function ConnectContent() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [tuningSlug, setTuningSlug] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [remoteMessage, setRemoteMessage] = useState<string | null>(null);
@@ -115,15 +116,53 @@ function ConnectContent() {
     setCode(val);
   };
 
-  const handleValidateCode = (e: React.FormEvent) => {
+  // Immediate TV pairing on code submit
+  const handleValidateAndConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     if (code.length !== 6) {
       setError('Please enter all 6 characters of the code shown on your TV screen.');
       return;
     }
+
     setError(null);
-    setStep('main');
-    setActiveTab('search');
+    setIsConnecting(true);
+
+    try {
+      const res = await fetch('/api/pair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pairCode: code,
+          station: 'arise',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || `Pairing code "${code}" not found. Please verify the code displayed on your TV screen.`);
+        setIsConnecting(false);
+        return;
+      }
+
+      const matched = stations.find((s) => s.slug === 'arise') || {
+        slug: 'arise',
+        name: data.station?.name || 'ARISE News',
+        tagline: data.station?.tagline || 'Live 24/7 Broadcast',
+        category: 'news',
+        youtubeHandle: '@arisenewschannel',
+        mode: 'live-first',
+      };
+
+      setActiveStation(matched);
+      setStep('main');
+      setActiveTab('remote');
+      setRemoteMessage(`Connected to TV! Broadcasting ${matched.name}.`);
+      refreshStations();
+    } catch (err) {
+      setError('Network connection error. Please make sure your phone and server are online.');
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   const handlePairStation = async (stationSlug: string) => {
@@ -254,7 +293,7 @@ function ConnectContent() {
   const quickSearchTags = ['BBC', 'CNN', 'MrBeast', 'MKBHD', 'Veritasium', 'Al Jazeera', 'Lofi Girl', 'NASA'];
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-3 sm:p-6 bg-[#080808] text-white">
+    <main className="min-h-screen flex items-center justify-center p-3 sm:p-6 bg-[#080808] text-white font-sans">
       <div className="w-full max-w-xl bg-[#121212] border border-[#242424] rounded-3xl p-5 sm:p-7 shadow-2xl space-y-5">
         
         {/* Brand Header */}
@@ -291,9 +330,12 @@ function ConnectContent() {
 
         {/* Global Error Banner */}
         {error && (
-          <div className="p-3 bg-red-950/70 border border-red-800 rounded-xl text-red-200 text-sm flex items-center justify-between">
-            <span>{error}</span>
-            <button onClick={() => setError(null)} className="text-red-400 font-bold ml-2">✕</button>
+          <div className="p-3.5 bg-red-950/80 border border-red-700/80 rounded-2xl text-red-200 text-sm flex items-start justify-between shadow-lg">
+            <div className="flex items-start space-x-2">
+              <span className="text-red-400 font-bold text-base">⚠️</span>
+              <span className="leading-snug">{error}</span>
+            </div>
+            <button onClick={() => setError(null)} className="text-red-400 font-bold ml-2 hover:text-white">✕</button>
           </div>
         )}
 
@@ -308,7 +350,7 @@ function ConnectContent() {
             STEP 1: 6-Character TV Code Entry
             ======================================================== */}
         {step === 'code' && (
-          <form onSubmit={handleValidateCode} className="space-y-6 py-2">
+          <form onSubmit={handleValidateAndConnect} className="space-y-6 py-2">
             <div className="space-y-2 text-center">
               <h2 className="text-2xl font-black text-white">Connect your TV</h2>
               <p className="text-sm text-gray-400 max-w-sm mx-auto">
@@ -327,37 +369,44 @@ function ConnectContent() {
                 className="w-full bg-[#1c1c1c] border-2 border-[#333] focus:border-red-600 focus:outline-none rounded-2xl py-4 text-center text-3xl font-mono font-black tracking-widest text-white uppercase transition-colors placeholder:text-gray-600"
               />
               <p className="text-xs text-gray-500 text-center">
-                e.g. 7X9K2P (Shown on the TV pairing screen)
+                e.g. 7X9K2P (Shown on your TV pairing screen)
               </p>
             </div>
 
             <button
               type="submit"
-              disabled={code.length !== 6 || isPending}
-              className="w-full py-4 px-6 rounded-2xl bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:hover:bg-red-600 text-white font-bold text-base transition-all duration-200 shadow-lg shadow-red-600/30"
+              disabled={code.length !== 6 || isConnecting}
+              className="w-full py-4 px-6 rounded-2xl bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:hover:bg-red-600 text-white font-bold text-base transition-all duration-200 shadow-lg shadow-red-600/30 flex items-center justify-center space-x-2"
             >
-              Continue to Channels & Remote →
+              {isConnecting ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Connecting to TV...</span>
+                </>
+              ) : (
+                <span>Connect to TV & Start Watching →</span>
+              )}
             </button>
           </form>
         )}
 
         {/* ========================================================
-            STEP 2: Main Companion Experience (Tabs: Search, Guide, Remote)
+            STEP 2: Main Companion Experience (Tabs: Remote, Guide, Search)
             ======================================================== */}
         {step === 'main' && (
           <div className="space-y-4">
             {/* Top Navigation Pill Tabs */}
             <div className="grid grid-cols-3 gap-1 bg-[#1a1a1a] p-1 rounded-2xl border border-[#262626]">
               <button
-                onClick={() => setActiveTab('search')}
+                onClick={() => setActiveTab('remote')}
                 className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 ${
-                  activeTab === 'search'
+                  activeTab === 'remote'
                     ? 'bg-red-600 text-white shadow-md'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                <span>🔍</span>
-                <span>Search</span>
+                <span>🎛️</span>
+                <span>Remote</span>
               </button>
 
               <button
@@ -373,20 +422,186 @@ function ConnectContent() {
               </button>
 
               <button
-                onClick={() => setActiveTab('remote')}
+                onClick={() => setActiveTab('search')}
                 className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 ${
-                  activeTab === 'remote'
+                  activeTab === 'search'
                     ? 'bg-red-600 text-white shadow-md'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                <span>🎛️</span>
-                <span>Remote</span>
+                <span>🔍</span>
+                <span>Search</span>
               </button>
             </div>
 
             {/* ----------------------------------------------------
-                TAB 1: Live Creator Search & 1-Tap Cast
+                TAB 1: TV Remote Control Dashboard
+                ---------------------------------------------------- */}
+            {activeTab === 'remote' && (
+              <div className="space-y-5">
+                {/* Active Station Card */}
+                <div className="bg-gradient-to-r from-[#1c1c1c] to-[#161616] border-2 border-red-600/60 rounded-2xl p-4 flex items-center justify-between shadow-xl">
+                  <div className="space-y-1 min-w-0">
+                    <div className="text-[10px] font-black text-red-400 tracking-wider uppercase flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                      Now Broadcasting on TV
+                    </div>
+                    <h3 className="text-lg font-black text-white truncate">{activeStation?.name || 'ARISE News'}</h3>
+                    <p className="text-xs text-gray-400 truncate">{activeStation?.tagline || 'Live 24/7 Broadcast'}</p>
+                  </div>
+                  <div className="px-3 py-1.5 bg-red-600 text-white text-xs font-black rounded-xl uppercase tracking-wider flex-shrink-0 shadow-md">
+                    CH {activeStation?.channelNumber || '01'}
+                  </div>
+                </div>
+
+                {/* Main Remote Controls */}
+                <div className="bg-[#161616] border border-[#262626] rounded-2xl p-5 space-y-4">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">TV Playback Controls</div>
+                  
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <button
+                      onClick={() => sendRemoteCommand(isPlaying ? 'PAUSE' : 'PLAY')}
+                      className={`py-3.5 px-4 rounded-xl font-black text-sm transition-colors shadow-md ${
+                        isPlaying ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
+                    >
+                      {isPlaying ? '⏸ PAUSE' : '▶ PLAY'}
+                    </button>
+
+                    <button
+                      onClick={() => sendRemoteCommand(isMuted ? 'UNMUTE' : 'MUTE')}
+                      className="py-3.5 px-4 rounded-xl bg-[#252525] hover:bg-[#333] text-gray-200 font-bold text-sm transition-colors"
+                    >
+                      {isMuted ? '🔊 UNMUTE' : '🔇 MUTE'}
+                    </button>
+
+                    <button
+                      onClick={() => sendRemoteCommand('NEXT_VIDEO')}
+                      className="py-3.5 px-4 rounded-xl bg-[#252525] hover:bg-[#333] text-gray-200 font-bold text-sm transition-colors"
+                    >
+                      ⏭ NEXT
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick Channel Flip Grid */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    <span>Quick Channel Flip</span>
+                    <button
+                      onClick={() => setActiveTab('search')}
+                      className="text-red-400 hover:text-red-300 normal-case font-semibold"
+                    >
+                      + Search & Add Channel
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                    {stations.map((st) => (
+                      <button
+                        key={st.slug}
+                        onClick={() => sendRemoteCommand('TUNE_STATION', { station: st.slug })}
+                        className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between h-20 ${
+                          activeStation?.slug === st.slug
+                            ? 'bg-red-600/20 border-red-600 text-white'
+                            : 'bg-[#181818] border-[#292929] hover:border-gray-500 text-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-[10px] font-mono text-emerald-400 font-bold">
+                            CH {st.channelNumber ? (st.channelNumber < 10 ? `0${st.channelNumber}` : st.channelNumber) : '01'}
+                          </span>
+                          <span className="text-[9px] uppercase font-bold text-gray-400">{st.category}</span>
+                        </div>
+                        <span className="text-xs font-bold truncate">{st.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ----------------------------------------------------
+                TAB 2: Curated Channel Lineup Guide
+                ---------------------------------------------------- */}
+            {activeTab === 'guide' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Broadcast Channel Lineup</h2>
+                    <p className="text-xs text-gray-400">Select any channel to tune your television.</p>
+                  </div>
+                </div>
+
+                {/* Category Filter Pills */}
+                <div className="flex space-x-1.5 overflow-x-auto pb-1 text-xs">
+                  {['all', 'news', 'tech', 'science', 'music', 'creator'].map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-3 py-1.5 rounded-xl font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${
+                        selectedCategory === cat
+                          ? 'bg-red-600 text-white shadow-sm'
+                          : 'bg-[#1c1c1c] text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Station Cards Grid */}
+                <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+                  {filteredStations.map((st) => {
+                    const isTuningThis = tuningSlug === st.slug;
+                    return (
+                      <div
+                        key={st.slug}
+                        className="bg-[#181818] border border-[#2b2b2b] hover:border-red-600/60 rounded-2xl p-3.5 transition-all flex items-center justify-between gap-3 group"
+                      >
+                        <div className="flex items-center space-x-3 min-w-0">
+                          {st.logoUrl ? (
+                            <img
+                              src={st.logoUrl}
+                              alt={st.name}
+                              className="w-11 h-11 rounded-xl object-cover bg-[#222] border border-[#333] flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-11 h-11 rounded-xl bg-[#222] border border-[#333] flex items-center justify-center text-xs font-black text-emerald-400 font-mono flex-shrink-0">
+                              CH {st.channelNumber ? (st.channelNumber < 10 ? `0${st.channelNumber}` : st.channelNumber) : '01'}
+                            </div>
+                          )}
+
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-1 rounded">
+                                CH {st.channelNumber ? (st.channelNumber < 10 ? `0${st.channelNumber}` : st.channelNumber) : '01'}
+                              </span>
+                              <h3 className="text-sm font-bold text-white truncate">{st.name}</h3>
+                              {st.mode === 'live-first' && (
+                                <span className="text-[9px] bg-red-600/30 text-red-400 px-1.5 py-0.2 rounded font-black">LIVE</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-400 truncate mt-0.5">{st.tagline}</p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handlePairStation(st.slug)}
+                          disabled={isPending || isTuningThis}
+                          className="py-2.5 px-3.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-black text-xs whitespace-nowrap transition-colors shadow-sm flex-shrink-0"
+                        >
+                          {isTuningThis ? 'TUNING...' : 'TUNE TV'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ----------------------------------------------------
+                TAB 3: Live Creator Search & 1-Tap Cast
                 ---------------------------------------------------- */}
             {activeTab === 'search' && (
               <div className="space-y-4">
@@ -485,172 +700,6 @@ function ConnectContent() {
                       );
                     })
                   )}
-                </div>
-              </div>
-            )}
-
-            {/* ----------------------------------------------------
-                TAB 2: Curated Channel Lineup Guide
-                ---------------------------------------------------- */}
-            {activeTab === 'guide' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold text-white">Broadcast Channel Lineup</h2>
-                    <p className="text-xs text-gray-400">Select any channel to tune your television.</p>
-                  </div>
-                </div>
-
-                {/* Category Filter Pills */}
-                <div className="flex space-x-1.5 overflow-x-auto pb-1 text-xs">
-                  {['all', 'news', 'tech', 'science', 'music', 'creator'].map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => setSelectedCategory(cat)}
-                      className={`px-3 py-1.5 rounded-xl font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${
-                        selectedCategory === cat
-                          ? 'bg-red-600 text-white shadow-sm'
-                          : 'bg-[#1c1c1c] text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Station Cards Grid */}
-                <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
-                  {filteredStations.map((st) => {
-                    const isTuningThis = tuningSlug === st.slug;
-                    return (
-                      <div
-                        key={st.slug}
-                        className="bg-[#181818] border border-[#2b2b2b] hover:border-red-600/60 rounded-2xl p-3.5 transition-all flex items-center justify-between gap-3 group"
-                      >
-                        <div className="flex items-center space-x-3 min-w-0">
-                          {st.logoUrl ? (
-                            <img
-                              src={st.logoUrl}
-                              alt={st.name}
-                              className="w-11 h-11 rounded-xl object-cover bg-[#222] border border-[#333] flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-11 h-11 rounded-xl bg-[#222] border border-[#333] flex items-center justify-center text-xs font-black text-emerald-400 font-mono flex-shrink-0">
-                              CH {st.channelNumber ? (st.channelNumber < 10 ? `0${st.channelNumber}` : st.channelNumber) : '01'}
-                            </div>
-                          )}
-
-                          <div className="min-w-0">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-1 rounded">
-                                CH {st.channelNumber ? (st.channelNumber < 10 ? `0${st.channelNumber}` : st.channelNumber) : '01'}
-                              </span>
-                              <h3 className="text-sm font-bold text-white truncate">{st.name}</h3>
-                              {st.mode === 'live-first' && (
-                                <span className="text-[9px] bg-red-600/30 text-red-400 px-1.5 py-0.2 rounded font-black">LIVE</span>
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-400 truncate mt-0.5">{st.tagline}</p>
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => handlePairStation(st.slug)}
-                          disabled={isPending || isTuningThis}
-                          className="py-2.5 px-3.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-black text-xs whitespace-nowrap transition-colors shadow-sm flex-shrink-0"
-                        >
-                          {isTuningThis ? 'TUNING...' : 'TUNE TV'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* ----------------------------------------------------
-                TAB 3: TV Remote Control Dashboard
-                ---------------------------------------------------- */}
-            {activeTab === 'remote' && (
-              <div className="space-y-5">
-                {/* Active Station Card */}
-                <div className="bg-gradient-to-r from-[#1c1c1c] to-[#161616] border-2 border-red-600/60 rounded-2xl p-4 flex items-center justify-between shadow-xl">
-                  <div className="space-y-1 min-w-0">
-                    <div className="text-[10px] font-black text-red-400 tracking-wider uppercase flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                      Now Broadcasting on TV
-                    </div>
-                    <h3 className="text-lg font-black text-white truncate">{activeStation?.name || 'ARISE News'}</h3>
-                    <p className="text-xs text-gray-400 truncate">{activeStation?.tagline || 'Live 24/7 Broadcast'}</p>
-                  </div>
-                  <div className="px-3 py-1.5 bg-red-600 text-white text-xs font-black rounded-xl uppercase tracking-wider flex-shrink-0 shadow-md">
-                    CH {activeStation?.channelNumber || '01'}
-                  </div>
-                </div>
-
-                {/* Main Remote D-Pad / Controls */}
-                <div className="bg-[#161616] border border-[#262626] rounded-2xl p-5 space-y-4">
-                  <div className="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">TV Playback Controls</div>
-                  
-                  <div className="grid grid-cols-3 gap-2.5">
-                    <button
-                      onClick={() => sendRemoteCommand(isPlaying ? 'PAUSE' : 'PLAY')}
-                      className={`py-3.5 px-4 rounded-xl font-black text-sm transition-colors shadow-md ${
-                        isPlaying ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      }`}
-                    >
-                      {isPlaying ? '⏸ PAUSE' : '▶ PLAY'}
-                    </button>
-
-                    <button
-                      onClick={() => sendRemoteCommand(isMuted ? 'UNMUTE' : 'MUTE')}
-                      className="py-3.5 px-4 rounded-xl bg-[#252525] hover:bg-[#333] text-gray-200 font-bold text-sm transition-colors"
-                    >
-                      {isMuted ? '🔊 UNMUTE' : '🔇 MUTE'}
-                    </button>
-
-                    <button
-                      onClick={() => sendRemoteCommand('NEXT_VIDEO')}
-                      className="py-3.5 px-4 rounded-xl bg-[#252525] hover:bg-[#333] text-gray-200 font-bold text-sm transition-colors"
-                    >
-                      ⏭ NEXT
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick Channel Flip Grid */}
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    <span>Quick Flip Lineup</span>
-                    <button
-                      onClick={() => setActiveTab('search')}
-                      className="text-red-400 hover:text-red-300 normal-case font-semibold"
-                    >
-                      + Search & Add Channel
-                    </button>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                    {stations.map((st) => (
-                      <button
-                        key={st.slug}
-                        onClick={() => sendRemoteCommand('TUNE_STATION', { station: st.slug })}
-                        className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between h-20 ${
-                          activeStation?.slug === st.slug
-                            ? 'bg-red-600/20 border-red-600 text-white'
-                            : 'bg-[#181818] border-[#292929] hover:border-gray-500 text-gray-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="text-[10px] font-mono text-emerald-400 font-bold">
-                            CH {st.channelNumber ? (st.channelNumber < 10 ? `0${st.channelNumber}` : st.channelNumber) : '01'}
-                          </span>
-                          <span className="text-[9px] uppercase font-bold text-gray-400">{st.category}</span>
-                        </div>
-                        <span className="text-xs font-bold truncate">{st.name}</span>
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             )}
