@@ -22,28 +22,42 @@ export async function POST(req: NextRequest) {
 
     // 1. Try Supabase
     try {
-      let query = supabaseAdmin.from('devices').select('id, paired, station_slug');
       if (deviceId) {
-        query = query.eq('id', deviceId);
-      } else if (rawCode) {
-        const pairCode = sanitizePairCode(rawCode);
-        query = query.eq('pair_code', pairCode);
+        const { data, error } = await supabaseAdmin
+          .from('devices')
+          .select('id, paired, station_slug, pair_code')
+          .eq('id', deviceId)
+          .maybeSingle();
+        if (!error && data) device = data;
       }
-      const { data, error } = await query.single();
-      if (!error && data) device = data;
-    } catch (e) {}
+
+      if (!device && rawCode) {
+        const pairCode = sanitizePairCode(rawCode);
+        const { data, error } = await supabaseAdmin
+          .from('devices')
+          .select('id, paired, station_slug, pair_code')
+          .ilike('pair_code', pairCode)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!error && data) device = data;
+      }
+    } catch (e: any) {
+      console.warn('[Device Command API] Supabase error:', e?.message);
+    }
 
     // 2. Fallback to memory store
     if (!device) {
       if (deviceId) {
         device = memoryDeviceStore.getById(deviceId);
-      } else if (rawCode) {
+      }
+      if (!device && rawCode) {
         device = memoryDeviceStore.getByPairCode(sanitizePairCode(rawCode));
       }
     }
 
     if (!device) {
-      return NextResponse.json({ error: 'Connected TV not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Connected TV not found. Please reconnect with your TV code.' }, { status: 404 });
     }
 
     const commandObj = {

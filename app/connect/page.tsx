@@ -46,6 +46,7 @@ export default function ConnectPage() {
 function ConnectContent() {
   const searchParams = useSearchParams();
   const [code, setCode] = useState('');
+  const [deviceId, setDeviceId] = useState<string | null>(null);
   const [step, setStep] = useState<'code' | 'main'>('code');
   const [activeTab, setActiveTab] = useState<'remote' | 'guide' | 'search'>('remote');
   const [activeStation, setActiveStation] = useState<Station | null>(null);
@@ -84,6 +85,31 @@ function ConnectContent() {
 
   useEffect(() => {
     searchChannels('');
+  }, []);
+
+  // Restore persisted connection from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedDeviceId = localStorage.getItem('creatorTvPhoneDeviceId');
+      const savedCode = localStorage.getItem('creatorTvPhonePairCode');
+      const savedStationJson = localStorage.getItem('creatorTvPhoneStation');
+
+      if (savedDeviceId || savedCode) {
+        if (savedDeviceId) setDeviceId(savedDeviceId);
+        if (savedCode) setCode(savedCode);
+
+        if (savedStationJson) {
+          try {
+            const parsed = JSON.parse(savedStationJson);
+            setActiveStation(parsed);
+          } catch (e) {}
+        }
+        setStep('main');
+        setActiveTab('remote');
+      }
+    } catch (e) {
+      console.warn('Failed reading localStorage:', e);
+    }
   }, []);
 
   // Handle URL query code (e.g. from QR scan: /connect?code=ABC123)
@@ -151,6 +177,15 @@ function ConnectContent() {
         return;
       }
 
+      const returnedDeviceId = data.deviceId || null;
+      if (returnedDeviceId) {
+        setDeviceId(returnedDeviceId);
+        try {
+          localStorage.setItem('creatorTvPhoneDeviceId', returnedDeviceId);
+          localStorage.setItem('creatorTvPhonePairCode', code);
+        } catch (e) {}
+      }
+
       const matched = stations.find((s) => s.slug === 'arise') || {
         slug: 'arise',
         name: data.station?.name || 'ARISE News',
@@ -160,6 +195,10 @@ function ConnectContent() {
         mode: 'live-first',
         channelNumber: 1,
       };
+
+      try {
+        localStorage.setItem('creatorTvPhoneStation', JSON.stringify(matched));
+      } catch (e) {}
 
       setActiveStation(matched);
       setStep('main');
@@ -183,6 +222,7 @@ function ConnectContent() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            deviceId: deviceId || undefined,
             pairCode: code,
             station: stationSlug,
           }),
@@ -195,6 +235,13 @@ function ConnectContent() {
           return;
         }
 
+        if (data.deviceId && !deviceId) {
+          setDeviceId(data.deviceId);
+          try {
+            localStorage.setItem('creatorTvPhoneDeviceId', data.deviceId);
+          } catch (e) {}
+        }
+
         const matched = stations.find((s) => s.slug === stationSlug) || {
           slug: stationSlug,
           name: data.station?.name || stationSlug,
@@ -203,6 +250,10 @@ function ConnectContent() {
           youtubeHandle: '',
           mode: 'live-first',
         };
+
+        try {
+          localStorage.setItem('creatorTvPhoneStation', JSON.stringify(matched));
+        } catch (e) {}
 
         setActiveStation(matched);
         setRemoteMessage(`Tuned TV to ${matched.name}`);
@@ -256,6 +307,7 @@ function ConnectContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          deviceId: deviceId || undefined,
           pairCode: code,
           action,
           payload,
@@ -266,7 +318,12 @@ function ConnectContent() {
       if (res.ok) {
         if (action === 'TUNE_STATION' && payload.station) {
           const matched = stations.find((s) => s.slug === payload.station);
-          if (matched) setActiveStation(matched);
+          if (matched) {
+            setActiveStation(matched);
+            try {
+              localStorage.setItem('creatorTvPhoneStation', JSON.stringify(matched));
+            } catch (e) {}
+          }
           setRemoteMessage(`TV tuned to ${matched?.name || payload.station}`);
         } else if (action === 'PLAY') {
           setIsPlaying(true);
@@ -288,11 +345,29 @@ function ConnectContent() {
 
         setTimeout(() => setRemoteMessage(null), 3000);
       } else {
-        setError(data.error || 'Command failed to reach TV');
+        if (res.status === 404) {
+          setError('Connected TV not found or session was reset. Click Exit to reconnect.');
+        } else {
+          setError(data.error || 'Command failed to reach TV');
+        }
       }
     } catch (err) {
       setError('Network error sending command');
     }
+  };
+
+  const handleDisconnect = () => {
+    try {
+      localStorage.removeItem('creatorTvPhoneDeviceId');
+      localStorage.removeItem('creatorTvPhonePairCode');
+      localStorage.removeItem('creatorTvPhoneStation');
+    } catch (e) {}
+    setDeviceId(null);
+    setCode('');
+    setStep('code');
+    setActiveStation(null);
+    setError(null);
+    setRemoteMessage(null);
   };
 
   const flipChannel = (direction: 1 | -1) => {
@@ -332,13 +407,10 @@ function ConnectContent() {
             {step === 'main' && (
               <div className="flex items-center space-x-2">
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-800/40 text-emerald-400 text-xs font-mono font-bold">
-                  {code}
+                  {code || 'PAIRED'}
                 </span>
                 <button
-                  onClick={() => {
-                    setStep('code');
-                    setActiveStation(null);
-                  }}
+                  onClick={handleDisconnect}
                   className="text-xs text-zinc-500 hover:text-zinc-300 px-1.5 py-1"
                   title="Disconnect TV"
                 >

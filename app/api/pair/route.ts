@@ -10,31 +10,46 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const rawCode = body?.pairCode;
+    const rawDeviceId = body?.deviceId;
     const rawStation = body?.station || 'arise';
 
-    const pairCode = sanitizePairCode(rawCode);
+    const pairCode = rawCode ? sanitizePairCode(rawCode) : '';
     const stationSlug = (rawStation || 'arise').toLowerCase().trim();
 
-    if (!isValidPairCodeFormat(pairCode)) {
+    if (!rawDeviceId && !isValidPairCodeFormat(pairCode)) {
       return NextResponse.json({ error: 'Please enter a valid 6-character code.' }, { status: 400 });
     }
 
     let device: any = null;
 
-    // 1. Try Supabase (case-insensitive query)
+    // 1. Try Supabase (by deviceId or case-insensitive pairCode)
     try {
-      const { data, error } = await supabaseAdmin
-        .from('devices')
-        .select('id, paired, pair_code, pair_code_expires_at, station_slug')
-        .ilike('pair_code', pairCode)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      if (rawDeviceId) {
+        const { data, error } = await supabaseAdmin
+          .from('devices')
+          .select('id, paired, pair_code, pair_code_expires_at, station_slug')
+          .eq('id', rawDeviceId)
+          .maybeSingle();
 
-      if (!error && data) {
-        device = data;
-      } else if (error) {
-        console.warn('[Pair API] Supabase query error:', error.message || error);
+        if (!error && data) {
+          device = data;
+        }
+      }
+
+      if (!device && pairCode && isValidPairCodeFormat(pairCode)) {
+        const { data, error } = await supabaseAdmin
+          .from('devices')
+          .select('id, paired, pair_code, pair_code_expires_at, station_slug')
+          .ilike('pair_code', pairCode)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data) {
+          device = data;
+        } else if (error) {
+          console.warn('[Pair API] Supabase query error:', error.message || error);
+        }
       }
     } catch (e: any) {
       console.warn('[Pair API] Supabase exception:', e?.message);
@@ -42,7 +57,12 @@ export async function POST(req: NextRequest) {
 
     // 2. Fallback to memory store
     if (!device) {
-      device = memoryDeviceStore.getByPairCode(pairCode);
+      if (rawDeviceId) {
+        device = memoryDeviceStore.getById(rawDeviceId);
+      }
+      if (!device && pairCode) {
+        device = memoryDeviceStore.getByPairCode(pairCode);
+      }
     }
 
     if (!device) {
